@@ -17,28 +17,36 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.02;
 document.body.appendChild(renderer.domElement);
 
 // ---------- Scene & camera ----------
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 200);
 const EYE = 1.65;
-camera.position.set(7.0, EYE, DIMS.Z1 / 2); // start in het kantoor
+camera.rotation.order = 'YXZ';
+camera.position.set(6.6, EYE, 1.55);            // start bij het zuidraam
+camera.lookAt(2.9, 1.45, 4.6);                  // kijk diagonaal richting bank + glaspui
 
 makeGoldenHourEnv(renderer, scene);
 
 // ---------- Belichting ----------
-scene.add(new THREE.HemisphereLight(0xfff1da, 0x5a4a38, 0.35));
-const sun = new THREE.DirectionalLight(0xffd7a0, 2.4);
-sun.position.set(-7, 5.5, -9);
+scene.add(new THREE.HemisphereLight(0xfff3e0, 0xa99a82, 0.5));
+
+// Golden-hour zon: laag vanuit de tuin (noord), stroomt door de glaspui.
+const sun = new THREE.DirectionalLight(0xffdca6, 2.6);
+sun.position.set(2.6, 5.2, DIMS.Z1 + 7);
+sun.target.position.set(4.2, 0.8, 3.0);
+scene.add(sun.target);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
-Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12, near: 0.5, far: 45 });
+Object.assign(sun.shadow.camera, { left: -8, right: 10, top: 12, bottom: -4, near: 0.5, far: 40 });
 sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
 scene.add(sun);
-const fill = new THREE.DirectionalLight(0xffe6c8, 0.25);
-fill.position.set(9, 4, 7);
+
+// Zacht invullicht vanuit het westraam.
+const fill = new THREE.DirectionalLight(0xffe9cf, 0.3);
+fill.position.set(-6, 3, 3);
 scene.add(fill);
 
 // ---------- Ruimte ----------
@@ -47,18 +55,16 @@ const { solids } = buildRoom(scene);
 // ---------- First-person controls (pointer lock) ----------
 const controls = new PointerLockControls(camera, renderer.domElement);
 scene.add(controls.getObject ? controls.getObject() : camera);
-// kijk-startrichting naar de woonkamer (-x)
-camera.rotation.order = 'YXZ';
-controls.getObject
-  ? controls.getObject().rotation.set(0, Math.PI / 2, 0)
-  : camera.rotation.set(0, Math.PI / 2, 0);
 
 const startEl = document.getElementById('start');
 const hud = document.getElementById('hud');
 const zoneEl = document.getElementById('zone');
 document.getElementById('enter').addEventListener('click', () => controls.lock());
 renderer.domElement.addEventListener('click', () => { if (!controls.isLocked) controls.lock(); });
-controls.addEventListener('lock', () => { startEl.classList.add('hidden'); hud.classList.add('show'); });
+controls.addEventListener('lock', () => {
+  startEl.classList.add('hidden'); hud.classList.add('show');
+  showZone('Woonkamer');
+});
 controls.addEventListener('unlock', () => { startEl.classList.remove('hidden'); hud.classList.remove('show'); });
 
 const keys = {};
@@ -67,26 +73,20 @@ addEventListener('keyup', e => keys[e.code] = false);
 
 // ---------- Collision ----------
 const PR = 0.32;
-const { X0, X1, Z0, Z1, WT, GLASS_X, DOOR_Z0, DOOR_Z1 } = DIMS;
+const { X0, X1, Z0, Z1 } = DIMS;
 function blocked(x, z) {
   if (x < X0 + PR || x > X1 - PR || z < Z0 + PR || z > Z1 - PR) return true;
   for (const s of solids) {
     if (x > s.minx - PR && x < s.maxx + PR && z > s.minz - PR && z < s.maxz + PR) return true;
   }
-  const inDoor = (z > DOOR_Z0 + 0.05 && z < DOOR_Z1 - 0.05);
-  if (!inDoor && Math.abs(x - GLASS_X) < WT + PR) return true;
   return false;
 }
 
 // ---------- Zone-label ----------
-let lastZone = '';
-function updateZone(x) {
-  const z = x < GLASS_X ? 'Woonkamer' : 'Kantoor';
-  if (z !== lastZone) {
-    lastZone = z; zoneEl.textContent = z; zoneEl.style.opacity = '0.85';
-    clearTimeout(updateZone._t);
-    updateZone._t = setTimeout(() => zoneEl.style.opacity = '0', 1600);
-  }
+function showZone(name) {
+  zoneEl.textContent = name; zoneEl.style.opacity = '0.85';
+  clearTimeout(showZone._t);
+  showZone._t = setTimeout(() => zoneEl.style.opacity = '0', 1800);
 }
 
 // ---------- Loop ----------
@@ -112,7 +112,6 @@ function animate() {
       if (!blocked(camera.position.x, nz)) camera.position.z = nz;
     }
     camera.position.y = EYE;
-    updateZone(camera.position.x);
   }
   renderer.render(scene, camera);
 }
@@ -123,3 +122,9 @@ addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
 });
+
+// Dev-hook (alleen met ?debug): handig om vanuit een tool camera te plaatsen
+// en screenshots te maken. Geen effect in normaal gebruik.
+if (new URLSearchParams(location.search).has('debug')) {
+  Object.assign(window, { THREE, scene, camera, renderer });
+}
