@@ -387,10 +387,21 @@ function freshState(){
 }
 
 /* ================= STORAGE ================= */
+/* window.storage (artifact-API) is leidend; ontbreekt die — zoals op localhost
+   of file:// — dan valt opslag terug op localStorage. */
 const store = {
-  async get(k){ try{ const r = await window.storage.get(k); return r? JSON.parse(r.value) : null; }catch(e){ return null; } },
-  async set(k,v){ try{ await window.storage.set(k, JSON.stringify(v)); return true; }catch(e){ return false; } },
-  async del(k){ try{ await window.storage.delete(k); }catch(e){} }
+  async get(k){
+    try{ const r = await window.storage.get(k); return r? JSON.parse(r.value) : null; }catch(e){}
+    try{ const v = localStorage.getItem(k); return v? JSON.parse(v) : null; }catch(e){ return null; }
+  },
+  async set(k,v){
+    try{ await window.storage.set(k, JSON.stringify(v)); return true; }catch(e){}
+    try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; }
+  },
+  async del(k){
+    try{ await window.storage.delete(k); }catch(e){}
+    try{ localStorage.removeItem(k); }catch(e){}
+  }
 };
 
 /* ================= PARSER ================= */
