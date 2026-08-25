@@ -15,6 +15,9 @@
   --rose:#e0417a;
   --line:#39395e;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --ds: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* gevechtsachtergrond — wordt per zone overschreven op #field */
+  --sky0:#8fd0ef; --sky1:#d6f0ff; --gnd0:#7ac74c; --gnd1:#4e8a34; --plat:#63a83c;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%}
@@ -66,35 +69,92 @@ canvas{image-rendering:pixelated; width:100%; height:auto; border:2px solid var(
 .abtn{background:var(--rose); border-color:var(--rose); color:#fff; font-size:13px; letter-spacing:.1em}
 .mbtn{background:#2b2b52}
 
-/* ---------- battle ---------- */
-#battle{background:var(--lcd); color:var(--ink)}
-#field{flex:1; min-height:0; position:relative; padding:10px 12px; display:flex; flex-direction:column; justify-content:space-between;
-  background:linear-gradient(180deg,var(--lcd),var(--lcd2))}
-.side{display:flex; align-items:flex-end; gap:10px}
-.side.foe{flex-direction:row}
-.side.mine{flex-direction:row-reverse}
-.mon{width:112px; height:112px; image-rendering:pixelated; flex:none; object-fit:contain}
-.mon.flip{transform:scaleX(-1)}   /* alleen als er géén echte achterkantsprite is */
-.card{background:rgba(255,255,255,.55); border:2px solid var(--ink); border-radius:6px; padding:6px 8px; min-width:150px; flex:1; max-width:230px}
-.cardTop{display:flex; justify-content:space-between; gap:6px; font-size:12px; font-weight:700}
-.hpbar{height:8px; background:#7d8a76; border:1px solid var(--ink); border-radius:4px; overflow:hidden; margin-top:4px}
-.hpfill{height:100%; background:#4a9d3f; transition:width .35s}
-.hpfill.mid{background:#d8a12a} .hpfill.low{background:#c3402a}
-.xpbar{height:4px; background:#7d8a76; border:1px solid var(--ink); border-radius:3px; overflow:hidden; margin-top:3px}
-.xpfill{height:100%; background:#3f7fbd; transition:width .3s}
-.meta{display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-top:3px}
-.badge{font-size:9px; padding:1px 5px; border-radius:3px; color:#fff; letter-spacing:.06em; text-transform:uppercase}
-.status{font-size:9px; padding:1px 4px; border:1px solid var(--ink); border-radius:3px; background:#e8e2b8}
-.balls{font-size:11px; letter-spacing:2px}
-#log{border-top:2px solid var(--ink); background:#e9f0e2; padding:10px 12px; min-height:52px; font-size:13px}
-#actions{display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:8px 10px 14px; background:#e9f0e2}
-.tile{
-  border:2px solid var(--ink); background:#fff; color:var(--ink); font-family:var(--mono); font-size:13px;
-  padding:12px 8px; border-radius:5px; cursor:pointer; text-align:left; line-height:1.25;
+/* ---------- battle: DS-stijl ---------- */
+/* Bovenveld = "bovenscherm": lucht + grond + twee platforms, vaste 4:3.
+   Log en knoppen daaronder = "onderscherm". */
+#battle{background:#20203a; color:#282828; font-family:var(--ds)}
+#field{
+  position:relative; flex:1 1 auto; width:100%; min-height:190px; overflow:hidden;
+  border-bottom:3px solid #101020;
+  background:
+    linear-gradient(180deg, var(--gnd0) 0%, var(--gnd1) 100%) bottom/100% 46% no-repeat,
+    linear-gradient(180deg, var(--sky0) 0%, var(--sky1) 100%) top/100% 56% no-repeat;
 }
-.tile:disabled{opacity:.35}
-.tile small{display:block; font-size:10px; opacity:.7; margin-top:2px}
-.tile.back{grid-column:1/-1; text-align:center; background:#d5ddcd}
+.plat{position:absolute; border-radius:50%; background:var(--plat);
+  box-shadow:0 -3px 0 rgba(255,255,255,.22) inset, 0 5px 10px rgba(0,0,0,.18)}
+#platFoe { right:8%;  top:36%;    width:34%; height:8% }
+#platMine{ left:4%;   bottom:8%;  width:42%; height:9% }
+
+.monWrap{position:absolute; display:flex; align-items:flex-end; justify-content:center}
+#foeWrap{ right:13%; top:12%;    width:24%; height:26% }
+#myWrap { left:8%;   bottom:11%; width:31%; height:31% }
+/* vult de wrapper, zodat kleine pixelsprites óók opschalen (blokkerig, bedoeld) */
+.mon{width:100%; height:100%; image-rendering:pixelated; object-fit:contain; object-position:bottom center}
+.mon.flip{transform:scaleX(-1)}   /* alleen als er géén echte achterkantsprite is */
+
+/* HP-kaders: tegenstander linksboven, eigen mon rechtsonder — als in de DS-games */
+.card{
+  position:absolute; padding:5px 9px 6px; border:2px solid #383838; border-radius:7px;
+  background:linear-gradient(180deg,#f8f8ec,#dcdccc); box-shadow:0 2px 0 rgba(0,0,0,.25), 0 0 0 2px rgba(255,255,255,.5);
+}
+.card.foe { left:3%;  top:6%;     width:50% }
+.card.mine{ right:3%; bottom:19%; width:50% }
+.cardTop{display:flex; justify-content:space-between; align-items:baseline; gap:6px; font-size:13px; font-weight:700; letter-spacing:.01em}
+.cardTop .lv{font-size:11px; font-weight:700; color:#484848}
+.hpRow{display:flex; align-items:center; gap:5px; margin-top:3px}
+.hpLbl{font-size:9px; font-weight:800; color:#c88a10; letter-spacing:.1em}
+.hpbar{flex:1; height:7px; background:#585858; border:1px solid #383838; border-radius:4px; overflow:hidden}
+.hpfill{height:100%; width:100%; background:linear-gradient(180deg,#7ce07c,#38b038); transition:width .45s ease}
+.hpfill.mid{background:linear-gradient(180deg,#ffd964,#e0a81c)}
+.hpfill.low{background:linear-gradient(180deg,#ff8a70,#d03020)}
+.xpbar{height:4px; background:#585858; border:1px solid #383838; border-radius:3px; overflow:hidden; margin-top:4px}
+.xpfill{height:100%; background:linear-gradient(180deg,#7cc4f0,#3f7fbd); transition:width .3s}
+.meta{display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-top:3px; gap:6px}
+.hpNum{text-align:right; font-size:11px; font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums}
+.badge{font-size:9px; padding:1px 5px; border-radius:3px; color:#fff; letter-spacing:.06em; text-transform:uppercase; font-weight:700}
+.status{font-size:9px; padding:1px 4px; border:1px solid #383838; border-radius:3px; background:#e8e2b8; font-weight:700; text-transform:uppercase}
+.balls{font-size:11px; letter-spacing:2px; color:#383838}
+
+/* bewegingseffecten */
+@keyframes lungeMine{ 45%{transform:translate(16%,-13%)} }
+@keyframes lungeFoe { 45%{transform:translate(-16%,13%)} }
+@keyframes hitBlink { 0%,100%{opacity:1} 15%,55%{opacity:.12} 35%,75%{opacity:1} }
+@keyframes dropOut  { to{transform:translateY(55%); opacity:0} }
+@keyframes riseIn   { from{transform:translateY(45%); opacity:0} }
+.monWrap.lungeMine{animation:lungeMine .28s ease-out}
+.monWrap.lungeFoe {animation:lungeFoe  .28s ease-out}
+.monWrap.hit      {animation:hitBlink  .34s linear}
+.monWrap.drop     {animation:dropOut   .45s ease-in forwards}
+.monWrap.rise     {animation:riseIn    .32s ease-out}
+
+/* onderscherm */
+#log{background:linear-gradient(180deg,#fbfbf2,#eaeadc); border-bottom:2px solid #c0c0b0;
+  padding:11px 13px; min-height:54px; font-size:14px; font-weight:600; color:#282828}
+#actions{display:grid; gap:7px; padding:9px 10px 14px; background:#cfcfe0}
+#actions.mode-main{grid-template-columns:1.55fr 1fr; grid-template-rows:repeat(3,1fr); min-height:172px}
+#actions.mode-moves{grid-template-columns:1fr 1fr}
+#actions.mode-list{grid-template-columns:1fr 1fr}
+.tile{
+  border:2px solid #383838; border-radius:8px; cursor:pointer; text-align:left; line-height:1.2;
+  font-family:var(--ds); font-size:13px; font-weight:700; color:#282828; padding:10px 10px;
+  background:linear-gradient(180deg,#fff,#e4e4d8);
+  box-shadow:0 2px 0 rgba(0,0,0,.28), 0 0 0 2px rgba(255,255,255,.45) inset;
+}
+.tile:active{transform:translateY(2px); box-shadow:0 0 0 rgba(0,0,0,.28), 0 0 0 2px rgba(255,255,255,.45) inset}
+.tile:disabled{opacity:.4; box-shadow:none}
+.tile small{display:block; font-size:10px; font-weight:700; opacity:.75; margin-top:3px}
+/* hoofdmenu: grote AANVAL naast drie smalle knoppen */
+.tile.fight{grid-row:1/4; display:flex; align-items:center; justify-content:center; text-align:center;
+  font-size:19px; letter-spacing:.06em; background:linear-gradient(180deg,#ff8a70,#d8402a); color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.tile.k-bag {background:linear-gradient(180deg,#ffd964,#e0a81c)}
+.tile.k-team{background:linear-gradient(180deg,#8ce07c,#3ba03a)}
+.tile.k-run {background:linear-gradient(180deg,#8cc4f0,#3f7fbd); color:#fff}
+/* aanvalstegels krijgen hun typekleur mee via --tc */
+.tile.move{background:linear-gradient(180deg, color-mix(in srgb, var(--tc) 55%, #fff), var(--tc)); min-height:62px}
+.tile.move .mvTop{display:flex; justify-content:space-between; align-items:baseline; gap:6px}
+.tile.move .pp{font-size:10px; font-weight:800; font-variant-numeric:tabular-nums}
+.tile.back{grid-column:1/-1; text-align:center; font-size:14px; letter-spacing:.08em;
+  background:linear-gradient(180deg,#8cc4f0,#3f7fbd); color:#fff}
 
 /* ---------- overlay menu ---------- */
 #overlay{position:fixed; inset:0; background:rgba(8,8,20,.86); display:none; z-index:20; padding:16px}
@@ -113,7 +173,7 @@ canvas{image-rendering:pixelated; width:100%; height:auto; border:2px solid var(
 .hdr h2{font-size:14px; letter-spacing:.14em; text-transform:uppercase; margin:0; color:var(--amber)}
 .toast{position:fixed; left:50%; transform:translateX(-50%); bottom:16px; background:var(--amber); color:#231502;
   padding:9px 14px; border-radius:6px; font-size:12px; z-index:40; font-weight:700}
-@media (prefers-reduced-motion: reduce){*{transition:none !important}}
+@media (prefers-reduced-motion: reduce){*{transition:none !important; animation:none !important}}
 </style>
 </head>
 <body>
@@ -164,14 +224,12 @@ canvas{image-rendering:pixelated; width:100%; height:auto; border:2px solid var(
 <!-- ============ BATTLE ============ -->
 <section id="battle" class="screen">
   <div id="field">
-    <div class="side foe">
-      <img class="mon" id="foeImg" alt="">
-      <div class="card" id="foeCard"></div>
-    </div>
-    <div class="side mine">
-      <img class="mon mine" id="myImg" alt="">
-      <div class="card" id="myCard"></div>
-    </div>
+    <div class="plat" id="platFoe"></div>
+    <div class="plat" id="platMine"></div>
+    <div class="monWrap" id="foeWrap"><img class="mon" id="foeImg" alt=""></div>
+    <div class="monWrap" id="myWrap"><img class="mon" id="myImg" alt=""></div>
+    <div class="card foe" id="foeCard"></div>
+    <div class="card mine" id="myCard"></div>
   </div>
   <div id="log">…</div>
   <div id="actions"></div>
@@ -788,6 +846,17 @@ async function autosave(){
 
 /* ================= BATTLE ================= */
 let B=null;
+/* achtergrond per zone — index volgt zone.tier */
+const ARENA = [
+  {sky0:"#8fd0ef", sky1:"#dff2ff", gnd0:"#86d05a", gnd1:"#4e8a34", plat:"#63a83c"}, // Route 1 — weide
+  {sky0:"#79c0e8", sky1:"#d8ecdc", gnd0:"#5fb05a", gnd1:"#2f6b34", plat:"#46903a"}, // Route 2 — bos
+  {sky0:"#f0b070", sky1:"#ffe6bc", gnd0:"#dcb070", gnd1:"#9c6a38", plat:"#c49050"}, // Route 3 — zand
+  {sky0:"#e07850", sky1:"#ffc890", gnd0:"#c86a48", gnd1:"#7a3a28", plat:"#b05436"}  // Hoogland — avond
+];
+function setArena(tier){
+  const a = ARENA[Math.max(0, Math.min(ARENA.length-1, tier|0))];
+  for(const k in a) $("field").style.setProperty("--"+k, a[k]);
+}
 function logMsg(t){
   return new Promise(res=>{
     $("log").textContent=t;
@@ -797,33 +866,79 @@ function logMsg(t){
     $("log").addEventListener("pointerdown",fin);
   });
 }
+/* Kaarten worden één keer opgebouwd en daarna bijgewerkt, zodat de HP-balk
+   echt kan leeglopen in plaats van te verspringen bij een innerHTML-herbouw. */
+function cardSkeleton(isFoe){
+  const head = `<div class="cardTop"><span class="nm"></span><span class="lv"></span></div>
+    <div class="hpRow"><span class="hpLbl">HP</span><div class="hpbar"><div class="hpfill"></div></div></div>`;
+  const meta = `<div class="meta"><span class="tps"></span><span class="rgt"></span></div>`;
+  return isFoe ? head+meta
+               : head+`<div class="hpNum"></div>`+meta+`<div class="xpbar"><div class="xpfill"></div></div>`;
+}
+function renderCard(el, mon, isFoe){
+  const key = mon.sp+"|"+(mon.shiny?1:0)+"|"+(isFoe?"f":"m");
+  if(el.dataset.key!==key){ el.innerHTML = cardSkeleton(isFoe); el.dataset.key = key; }
+  const q = s=>el.querySelector(s);
+  q(".nm").textContent = nameOf(mon)+(mon.shiny?" ✦":"");
+  q(".lv").textContent = "Lv"+mon.lvl;
+  const p = Math.max(0, mon.hp/mon.maxHp*100);
+  const fill = q(".hpfill");
+  fill.className = "hpfill"+(p<25?" low":p<55?" mid":"");
+  fill.style.width = p+"%";
+  q(".tps").innerHTML = spOf(mon).types.map(t=>`<span class="badge" style="background:${TYPES[t].c}">${TYPES[t].nl}</span>`).join(" ");
+  const balls = (isFoe && B.trainer)
+    ? `<span class="balls">${"●".repeat(B.foeTeam.filter(x=>x.hp>0).length)}${"○".repeat(B.foeTeam.filter(x=>x.hp<=0).length)}</span>` : "";
+  q(".rgt").innerHTML = (mon.status?`<span class="status">${mon.status}</span> `:"")+balls;
+  if(!isFoe){
+    q(".hpNum").textContent = mon.hp+"/"+mon.maxHp;
+    const need = expFor(mon.lvl+1)-expFor(mon.lvl), have = mon.exp-expFor(mon.lvl);
+    q(".xpfill").style.width = Math.max(0,Math.min(100,have/need*100))+"%";
+  }
+}
 function renderCards(){
-  const f=B.foe, m=B.mine;
-  const bar=(mon)=>{ const p=mon.hp/mon.maxHp*100; const cls=p<25?"low":p<55?"mid":""; return `<div class="hpbar"><div class="hpfill ${cls}" style="width:${Math.max(0,p)}%"></div></div>`; };
-  const types=(mon)=>spOf(mon).types.map(t=>`<span class="badge" style="background:${TYPES[t].c}">${TYPES[t].nl}</span>`).join(" ");
-  const balls = B.trainer ? `<span class="balls">${"●".repeat(B.foeTeam.filter(x=>x.hp>0).length)}${"○".repeat(B.foeTeam.filter(x=>x.hp<=0).length)}</span>` : "";
-  $("foeCard").innerHTML = `<div class="cardTop"><span>${nameOf(f)}${f.shiny?" ✦":""}</span><span>Lv${f.lvl}</span></div>${bar(f)}
-    <div class="meta"><span>${types(f)}</span><span>${f.status?`<span class="status">${f.status}</span>`:""} ${balls}</span></div>`;
-  const need=expFor(m.lvl+1)-expFor(m.lvl), have=m.exp-expFor(m.lvl);
-  $("myCard").innerHTML = `<div class="cardTop"><span>${nameOf(m)}${m.shiny?" ✦":""}</span><span>Lv${m.lvl}</span></div>${bar(m)}
-    <div class="meta"><span>${m.hp}/${m.maxHp}</span><span>${m.status?`<span class="status">${m.status}</span>`:""}</span></div>
-    <div class="xpbar"><div class="xpfill" style="width:${Math.max(0,Math.min(100,have/need*100))}%"></div></div>`;
-  setImg($("foeImg"), f, false); setImg($("myImg"), m, true);
+  renderCard($("foeCard"), B.foe, true);
+  renderCard($("myCard"), B.mine, false);
+  setImg($("foeImg"), B.foe, false);
+  setImg($("myImg"), B.mine, true);
+}
+
+/* bewegingseffecten */
+const uidMap = new WeakMap(); let _uid=0;
+const monKey = m=>{ let u=uidMap.get(m); if(!u){ u=++_uid; uidMap.set(m,u); } return String(u); };
+const wrapOf = m=>$(m===B.mine ? "myWrap" : "foeWrap");
+function anim(el, cls, ms, keep){
+  return new Promise(res=>{
+    el.classList.remove(cls);
+    void el.offsetWidth;                       // forceer herstart van de animatie
+    el.classList.add(cls);
+    setTimeout(()=>{ if(!keep) el.classList.remove(cls); res(); }, ms);
+  });
 }
 function setImg(el, mon, back){
   const sp = spOf(mon);
   const src = spriteOf(sp, back, mon.shiny);
+  const w = el.parentElement;
   // spiegelen is alleen nog nodig als we de voorkant als achterkant hergebruiken
   el.classList.toggle("flip", !!back && !hasBack(sp));
+  // nieuw exemplaar in het veld: eventuele val-animatie wissen en laten opkomen
+  if(w.dataset.mon !== monKey(mon)){
+    w.dataset.mon = monKey(mon);
+    w.classList.remove("drop");
+    anim(w, "rise", 320);
+  }
   if(el.dataset.src===src) return;
   el.dataset.src=src; el.src=src;
   el.onerror=()=>{ el.onerror=null; el.src=placeholder(sp, mon.shiny); };
 }
-function actions(list){
-  const box=$("actions"); box.innerHTML="";
+function actions(list, mode){
+  const box=$("actions");
+  box.className = "mode-"+(mode||"list");
+  box.innerHTML="";
   list.forEach(a=>{
-    const b=document.createElement("button"); b.className="tile"+(a.back?" back":"");
-    b.innerHTML = a.sub? `${a.label}<small>${a.sub}</small>` : a.label;
+    const b=document.createElement("button");
+    b.className = "tile"+(a.cls?" "+a.cls:"")+(a.back?" back":"");
+    if(a.tc) b.style.setProperty("--tc", a.tc);
+    b.innerHTML = a.html || (a.sub? `${a.label}<small>${a.sub}</small>` : a.label);
     b.disabled = !!a.disabled; b.onclick=a.fn; box.appendChild(b);
   });
 }
@@ -834,7 +949,7 @@ function wildEncounter(){
   const pool = poolFor(z.tier);
   const sp = pool[rnd(pool.length)];
   const lvl = z.lvl[0] + rnd(z.lvl[1]-z.lvl[0]+1);
-  startBattle([makeMon(sp.id-1, lvl)], null);
+  startBattle([makeMon(sp.id-1, lvl)], null, z.tier);
 }
 function trainerBattle(tr){
   const pool = poolFor(tr.tier);
@@ -843,13 +958,16 @@ function trainerBattle(tr){
     const sp = pool[rnd(pool.length)];
     team.push(makeMon(sp.id-1, Math.max(2, tr.lvl - rnd(3))));
   }
-  startBattle(team, tr);
+  startBattle(team, tr, tr.tier);
 }
-async function startBattle(foeTeam, trainer){
+async function startBattle(foeTeam, trainer, tier){
   if(!firstAlive(S.party)){ toast("Je team is uitgeput — genees eerst"); return; }
   busy=true;
   B = {foeTeam, trainer, mine:firstAlive(S.party), foe:foeTeam[0], over:false, ran:false};
   S.seen[spOf(B.foe).id]=1;
+  setArena(tier!==undefined ? tier : (zoneAt(S.pos.y)?.tier ?? 0));
+  // schoon veld: geen val-animatie of oude eigenaar uit een vorig gevecht
+  ["foeWrap","myWrap"].forEach(id=>{ const w=$(id); w.classList.remove("drop"); w.dataset.mon=""; });
   show("battle"); renderCards();
   await logMsg(trainer? `${trainer.label} daagt je uit!` : `Een wilde ${nameOf(B.foe)} verschijnt!`);
   if(!trainer && B.foe.shiny) await logMsg(`${nameOf(B.foe)} glinstert — een shiny!`);
@@ -860,22 +978,24 @@ function playerTurn(){
   if(B.over) return;
   renderCards();
   actions([
-    {label:"Aanval", fn:menuMoves},
-    {label:"Team", fn:menuSwitch},
-    {label:"Tas", fn:menuItems},
-    {label: B.trainer? "Vluchten kan niet":"Vluchten", disabled:!!B.trainer, fn:tryRun}
-  ]);
+    {label:"AANVAL", cls:"fight", fn:menuMoves},
+    {label:"TAS",    cls:"k-bag",  fn:menuItems},
+    {label:"TEAM",   cls:"k-team", fn:menuSwitch},
+    {label: B.trainer? "GEEN VLUCHT":"VLUCHTEN", cls:"k-run", disabled:!!B.trainer, fn:tryRun}
+  ], "main");
   $("log").textContent = `Wat doet ${nameOf(B.mine)}?`;
 }
 function menuMoves(){
   const list = B.mine.moves.map(mv=>({
-    label: mv.name,
-    sub: `${TYPES[mv.type].nl} · ${mv.power?("kr "+mv.power):"status"} · ${mv.ppLeft}/${mv.pp}`,
+    cls:"move", tc: TYPES[mv.type].c,
+    html:`<div class="mvTop"><span>${mv.name}</span><span class="pp">PP ${mv.ppLeft}/${mv.pp}</span></div>
+          <small><span class="badge" style="background:rgba(0,0,0,.45)">${TYPES[mv.type].nl}</span>
+          ${mv.power? "kracht "+mv.power : "status"}</small>`,
     disabled: mv.ppLeft<=0,
     fn: ()=>doTurn({kind:"move", move:mv})
   }));
-  list.push({label:"Terug", back:true, fn:playerTurn});
-  actions(list);
+  list.push({label:"TERUG", back:true, fn:playerTurn});
+  actions(list, "moves");
 }
 function menuSwitch(){
   const list = S.party.map((m,i)=>({
@@ -883,8 +1003,8 @@ function menuSwitch(){
     disabled: m.hp<=0 || m===B.mine,
     fn: ()=>doTurn({kind:"switch", mon:m})
   }));
-  list.push({label:"Terug", back:true, fn:playerTurn});
-  actions(list);
+  list.push({label:"TERUG", back:true, fn:playerTurn});
+  actions(list, "list");
 }
 function menuItems(){
   const list=[];
@@ -895,8 +1015,8 @@ function menuItems(){
       fn: ()=>doTurn({kind:"item", key:k})});
   }
   if(!list.length) list.push({label:"Tas is leeg", disabled:true, fn:()=>{}});
-  list.push({label:"Terug", back:true, fn:playerTurn});
-  actions(list);
+  list.push({label:"TERUG", back:true, fn:playerTurn});
+  actions(list, "list");
 }
 function tryRun(){ doTurn({kind:"run"}); }
 
@@ -950,6 +1070,7 @@ async function useMove(user, target, mv, isPlayer){
   if(user.status==="par" && Math.random()<0.25) return logMsg(`${nameOf(user)} is verlamd en kan niet bewegen!`);
   mv.ppLeft--;
   await logMsg(`${nameOf(user)} gebruikt ${mv.name}!`);
+  await anim(wrapOf(user), user===B.mine ? "lungeMine" : "lungeFoe", 280);
   if(Math.random()*100 > mv.acc) return logMsg("Maar het mist!");
   if(!mv.power){
     if(mv.heal){ const h=Math.floor(user.maxHp*mv.heal); user.hp=Math.min(user.maxHp,user.hp+h); renderCards(); await logMsg(`${nameOf(user)} herstelt ${h} HP.`); }
@@ -970,14 +1091,17 @@ async function useMove(user, target, mv, isPlayer){
   const rand = 0.85+Math.random()*0.15;
   let dmg = Math.floor(Math.floor(Math.floor(2*user.lvl/5+2)*mv.power*A/D)/50)+2;
   dmg = Math.max(1, Math.floor(dmg*stab*e*crit*rand));
+  const tw = wrapOf(target);
   target.hp = Math.max(0, target.hp-dmg);
   renderCards();
+  await anim(tw, "hit", 340);
   if(crit>1) await logMsg("Een kritieke treffer!");
   if(e>1) await logMsg("Het is erg effectief!");
   else if(e<1) await logMsg("Het is niet erg effectief…");
   if(target.hp<=0) await faint(target);
 }
 async function faint(mon){
+  await anim(wrapOf(mon), "drop", 460, true);
   await logMsg(`${nameOf(mon)} gaat neer!`);
   if(mon===B.foe){
     const gain = Math.floor(B.foe.lvl*B.foe.lvl*1.6);
