@@ -74,7 +74,7 @@ canvas{image-rendering:pixelated; width:100%; height:auto; border:2px solid var(
 .side.foe{flex-direction:row}
 .side.mine{flex-direction:row-reverse}
 .mon{width:112px; height:112px; image-rendering:pixelated; flex:none; object-fit:contain}
-.mon.mine{transform:scaleX(-1)}
+.mon.flip{transform:scaleX(-1)}   /* alleen als er géén echte achterkantsprite is */
 .card{background:rgba(255,255,255,.55); border:2px solid var(--ink); border-radius:6px; padding:6px 8px; min-width:150px; flex:1; max-width:230px}
 .cardTop{display:flex; justify-content:space-between; gap:6px; font-size:12px; font-weight:700}
 .hpbar{height:8px; background:#7d8a76; border:1px solid var(--ink); border-radius:4px; overflow:hidden; margin-top:4px}
@@ -131,10 +131,12 @@ canvas{image-rendering:pixelated; width:100%; height:auto; border:2px solid var(
   <label for="data">Wezens — één per regel</label>
   <textarea id="data" spellcheck="false" placeholder="Naam | type1, type2 | sprite.png"></textarea>
   <div class="hint">
-    Scheiding met <b>|</b> (of tab). Tweede type mag weg. Sprite mag weg → dan tekent de engine een placeholder.<br>
+    Scheiding met <b>|</b> (of tab). Tweede type mag weg. Sprites mogen weg → dan tekent de engine een placeholder.<br>
+    Tot vier sprites, in deze volgorde: <b>voorkant · voorkant-shiny · achterkant · achterkant-shiny</b>.
+    Alleen een voorkant mag ook; de rest valt daarop terug. Sla een slot over met <b>—</b>.<br>
     Evolutie: zet er achter <b>&gt; Naamvanevolutie 16</b> (naam + level).<br>
     Voorbeeld:<br>
-    <code>Vonkling | vuur | 001.png &gt; Vlamgard 16</code>
+    <code>Vonkling | vuur | 001.gif | 001s.gif | 001b.gif | 001bs.gif &gt; Vlamgard 16</code>
   </div>
 
   <div class="row">
@@ -312,8 +314,9 @@ function buildSpecies(raw, index, total){
 
 /* ================= PLACEHOLDER SPRITE ================= */
 const spriteCache = {};
-function placeholder(sp){
-  if(spriteCache[sp.name]) return spriteCache[sp.name];
+function placeholder(sp, shiny){
+  const ck = sp.name + (shiny?"|s":"");
+  if(spriteCache[ck]) return spriteCache[ck];
   const S=18, half=9, g=[];
   for(let y=0;y<S;y++) g.push(new Array(S).fill(0));
   const r = rngFrom(hash(sp.name));
@@ -337,19 +340,30 @@ function placeholder(sp){
     const n=[[0,1],[0,-1],[1,0],[-1,0]].some(([dx,dy])=>{const a=g[y+dy]&&g[y+dy][x+dx]; return a===1||a===2||a===3;});
     if(n) g[y][x]=4;
   }
-  const c = TYPES[sp.types[0]].c;
+  let c = TYPES[sp.types[0]].c;
+  if(shiny) c = "#"+c.slice(3)+c.slice(1,3);   // kanaalrotatie: duidelijk andere tint
   const cv=document.createElement("canvas"); cv.width=S; cv.height=S;
   const ctx=cv.getContext("2d");
   const colors={1:c,2:shade(c,32),3:"#1a1a24",4:shade(c,-58)};
   for(let y=0;y<S;y++) for(let x=0;x<S;x++) if(g[y][x]){ ctx.fillStyle=colors[g[y][x]]; ctx.fillRect(x,y,1,1); }
-  return spriteCache[sp.name]=cv.toDataURL();
+  return spriteCache[ck]=cv.toDataURL();
 }
 function shade(hex,amt){
   const n=parseInt(hex.slice(1),16);
   const cl=v=>Math.max(0,Math.min(255,v));
   return "#"+[(n>>16)+amt,((n>>8)&255)+amt,(n&255)+amt].map(v=>cl(v).toString(16).padStart(2,"0")).join("");
 }
-function spriteOf(sp){ return sp.img || placeholder(sp); }
+/* Kiest de beste sprite voor een aanzicht en valt terug: gevraagde variant →
+   achterkant → voorkant → placeholder. Oude opslag met één string blijft werken. */
+function imgsOf(sp){ return typeof sp.img==="string" ? {front:sp.img} : (sp.img||{}); }
+function hasBack(sp){ const im=imgsOf(sp); return !!(im.back||im.backShiny); }
+function spriteOf(sp, back, shiny){
+  const im = imgsOf(sp);
+  const chain = back
+    ? (shiny ? [im.backShiny, im.back, im.frontShiny, im.front] : [im.back, im.front])
+    : (shiny ? [im.frontShiny, im.front] : [im.front]);
+  return chain.find(Boolean) || placeholder(sp, shiny);
+}
 
 /* ================= MON INSTANCE ================= */
 const expFor = (lvl)=>lvl*lvl*lvl;
@@ -357,14 +371,16 @@ function statAt(sp, lvl, key){
   const b=sp.base[key];
   return key==="hp" ? Math.floor(b*2*lvl/100)+lvl+10 : Math.floor(b*2*lvl/100)+5;
 }
-function makeMon(spId, lvl){
+const SHINY_ODDS = 512;   // 1 op N — draaiknop
+function makeMon(spId, lvl, shiny){
   const sp = DEX[spId];
   const moves = [];
   for(const [l,m] of sp.learn){
     if(l>lvl || moves.some(x=>x.name===m.name)) continue;
     moves.push({...m, ppLeft:m.pp}); if(moves.length>4) moves.shift();
   }
-  const mon = {sp:spId, lvl, exp:expFor(lvl), status:null, sleepT:0, boosts:{atk:0,def:0,spa:0,spd:0,spe:0}, moves};
+  if(shiny===undefined) shiny = Math.random() < 1/SHINY_ODDS;
+  const mon = {sp:spId, lvl, exp:expFor(lvl), shiny, status:null, sleepT:0, boosts:{atk:0,def:0,spa:0,spd:0,spe:0}, moves};
   mon.maxHp = statAt(sp,lvl,"hp"); mon.hp = mon.maxHp;
   return mon;
 }
@@ -421,19 +437,25 @@ function parseList(text, basePath){
     fields = fields.map(f=>f.trim()).filter(Boolean);
     if(!fields.length) return;
     const name = fields.shift();
-    let img=null;
     const asTypes = f => { const ps=f.split(/[,\/+\s]+/).filter(Boolean); return ps.length && ps.every(t=>ALIAS[t.toLowerCase()]); };
     const asPath  = f => /^(https?:|data:|\.{0,2}\/)/i.test(f) || /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i.test(f);
-    if(fields.length>1 && asPath(fields[fields.length-1]) && !asTypes(fields[fields.length-1])){
-      img = fields.pop();
-    }
+    // alle padvelden, op volgorde: voorkant, voorkant-shiny, achterkant, achterkant-shiny
+    const paths=[], rest=[];
+    fields.forEach(f=>{
+      if(f==="—"||f==="-"){ paths.push(null); return; }   // lege sprite-slot, houdt volgorde intact
+      (asPath(f) && !asTypes(f) ? paths : rest).push(f);
+    });
+    fields = rest;
     const types=[];
     fields.join(" ").split(/[,\/+\s]+/).filter(Boolean).forEach(t=>{
       const k = ALIAS[t.toLowerCase()];
       if(k && !types.includes(k)) types.push(k);
     });
     if(!types.length){ errs.push(`regel ${i+1} "${name}": geen geldig type`); return; }
-    if(img && !/^(https?:|\/|data:)/i.test(img) && basePath) img = basePath + img;
+    const abs = p => !p ? null : (/^(https?:|\/|data:)/i.test(p) || !basePath) ? p : basePath + p;
+    const img = paths.length
+      ? {front:abs(paths[0]), frontShiny:abs(paths[1]), back:abs(paths[2]), backShiny:abs(paths[3])}
+      : null;
     out.push({name, types:types.slice(0,2), img, evo, evoLvl});
   });
   // mark evolution targets
@@ -504,7 +526,7 @@ $("typelist").textContent = TKEYS.map(k=>TYPES[k].nl).join(" · ");
 /* ================= SETUP SCREEN ================= */
 $("demo").onclick = ()=>{
   $("data").value =
-`Bulbasaur | plant, gif | https://img.pokemondb.net/sprites/scarlet-violet/normal/bulbasaur.png
+`Bulbasaur | plant, gif | https://img.pokemondb.net/sprites/black-white/anim/normal/bulbasaur.gif | https://img.pokemondb.net/sprites/black-white/anim/shiny/bulbasaur.gif | https://img.pokemondb.net/sprites/black-white/anim/back-normal/bulbasaur.gif | https://img.pokemondb.net/sprites/black-white/anim/back-shiny/bulbasaur.gif
 Vonkling | vuur | > Vlamgard 16
 Vlamgard | vuur, draak
 Druppel | water | > Vloedra 16
@@ -555,10 +577,10 @@ $("panelClose").onclick = closePanel;
 function monRow(mon, sub, onClick){
   const d = document.createElement("div"); d.className="item";
   const sp = spOf(mon);
-  const img = document.createElement("img"); img.src = spriteOf(sp);
-  img.onerror = ()=>{ img.onerror=null; img.src = placeholder(sp); };
+  const img = document.createElement("img"); img.src = spriteOf(sp, false, mon.shiny);
+  img.onerror = ()=>{ img.onerror=null; img.src = placeholder(sp, mon.shiny); };
   const txt = document.createElement("div");
-  txt.innerHTML = `<div class="n">${sp.name} <span style="color:#8c8cb4">Lv${mon.lvl}</span></div>
+  txt.innerHTML = `<div class="n">${sp.name}${mon.shiny?" ✦":""} <span style="color:#8c8cb4">Lv${mon.lvl}</span></div>
     <div class="d">${sp.types.map(t=>TYPES[t].nl).join(" / ")} — ${mon.hp}/${mon.maxHp} HP${mon.status?" · "+mon.status.toUpperCase():""}${sub?" · "+sub:""}</div>`;
   d.append(img, txt);
   if(onClick) d.onclick = onClick; else d.style.cursor="default";
@@ -739,8 +761,8 @@ function openDex(){
     const g=document.createElement("div"); g.className="grid";
     DEX.forEach(sp=>{
       const c=document.createElement("div"); c.className="dexcell"+(S.seen[sp.id]?"":" unseen");
-      const img=document.createElement("img"); img.src=spriteOf(sp);
-      img.onerror=()=>{ img.onerror=null; img.src=placeholder(sp); };
+      const img=document.createElement("img"); img.src=spriteOf(sp,false,false);
+      img.onerror=()=>{ img.onerror=null; img.src=placeholder(sp,false); };
       const n=document.createElement("div"); n.textContent = S.seen[sp.id]? sp.name : "???";
       c.append(img,n); g.appendChild(c);
     });
@@ -780,19 +802,22 @@ function renderCards(){
   const bar=(mon)=>{ const p=mon.hp/mon.maxHp*100; const cls=p<25?"low":p<55?"mid":""; return `<div class="hpbar"><div class="hpfill ${cls}" style="width:${Math.max(0,p)}%"></div></div>`; };
   const types=(mon)=>spOf(mon).types.map(t=>`<span class="badge" style="background:${TYPES[t].c}">${TYPES[t].nl}</span>`).join(" ");
   const balls = B.trainer ? `<span class="balls">${"●".repeat(B.foeTeam.filter(x=>x.hp>0).length)}${"○".repeat(B.foeTeam.filter(x=>x.hp<=0).length)}</span>` : "";
-  $("foeCard").innerHTML = `<div class="cardTop"><span>${nameOf(f)}</span><span>Lv${f.lvl}</span></div>${bar(f)}
+  $("foeCard").innerHTML = `<div class="cardTop"><span>${nameOf(f)}${f.shiny?" ✦":""}</span><span>Lv${f.lvl}</span></div>${bar(f)}
     <div class="meta"><span>${types(f)}</span><span>${f.status?`<span class="status">${f.status}</span>`:""} ${balls}</span></div>`;
   const need=expFor(m.lvl+1)-expFor(m.lvl), have=m.exp-expFor(m.lvl);
-  $("myCard").innerHTML = `<div class="cardTop"><span>${nameOf(m)}</span><span>Lv${m.lvl}</span></div>${bar(m)}
+  $("myCard").innerHTML = `<div class="cardTop"><span>${nameOf(m)}${m.shiny?" ✦":""}</span><span>Lv${m.lvl}</span></div>${bar(m)}
     <div class="meta"><span>${m.hp}/${m.maxHp}</span><span>${m.status?`<span class="status">${m.status}</span>`:""}</span></div>
     <div class="xpbar"><div class="xpfill" style="width:${Math.max(0,Math.min(100,have/need*100))}%"></div></div>`;
-  setImg($("foeImg"), spOf(f)); setImg($("myImg"), spOf(m));
+  setImg($("foeImg"), f, false); setImg($("myImg"), m, true);
 }
-function setImg(el, sp){
-  const src = spriteOf(sp);
+function setImg(el, mon, back){
+  const sp = spOf(mon);
+  const src = spriteOf(sp, back, mon.shiny);
+  // spiegelen is alleen nog nodig als we de voorkant als achterkant hergebruiken
+  el.classList.toggle("flip", !!back && !hasBack(sp));
   if(el.dataset.src===src) return;
   el.dataset.src=src; el.src=src;
-  el.onerror=()=>{ el.onerror=null; el.src=placeholder(sp); };
+  el.onerror=()=>{ el.onerror=null; el.src=placeholder(sp, mon.shiny); };
 }
 function actions(list){
   const box=$("actions"); box.innerHTML="";
@@ -827,6 +852,7 @@ async function startBattle(foeTeam, trainer){
   S.seen[spOf(B.foe).id]=1;
   show("battle"); renderCards();
   await logMsg(trainer? `${trainer.label} daagt je uit!` : `Een wilde ${nameOf(B.foe)} verschijnt!`);
+  if(!trainer && B.foe.shiny) await logMsg(`${nameOf(B.foe)} glinstert — een shiny!`);
   await logMsg(`Ga, ${nameOf(B.mine)}!`);
   playerTurn();
 }
@@ -1038,7 +1064,10 @@ function finish(){
   if(d && d.raw && d.raw.length){
     $("data").value = d.raw.map(r=>{
       let s = r.name+" | "+r.types.map(t=>TYPES[t].nl).join(", ");
-      if(r.img) s += " | "+r.img;
+      const im = typeof r.img==="string" ? {front:r.img} : (r.img||{});
+      const ps = [im.front, im.frontShiny, im.back, im.backShiny];
+      while(ps.length && !ps[ps.length-1]) ps.pop();          // lege staart weg
+      if(ps.length) s += " | "+ps.map(p=>p||"—").join(" | "); // "—" houdt de volgorde intact
       if(r.evo) s += " > "+r.evo+" "+r.evoLvl;
       return s;
     }).join("\n");
