@@ -1072,7 +1072,9 @@ function finish(){
       return s;
     }).join("\n");
     $("base").value = d.basePath||"";
-    $("report").innerHTML = '<span class="ok">Vorige lijst teruggeladen. Klik "Wezens laden" om verder te spelen.</span>';
+    $("report").innerHTML = '<span class="ok">Vorige lijst teruggeladen — klik "Wezens laden" om verder te spelen.</span>\n'
+      + '<span class="hint">Dit is je eigen opgeslagen lijst, niet de ingebouwde voorbeeldlijst. '
+      + 'Klik "Voorbeeldlijst" als je de actuele standaardlijst wilt.</span>';
   }
 })();
 </script>
